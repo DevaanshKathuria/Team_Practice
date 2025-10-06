@@ -29,10 +29,14 @@ app.use(express.static(__dirname, { extensions: ['html'] }))
 // Structure: { email: { name, email, passwordHash, createdAt } }
 const users = {}
 
-// Helper: sign a JWT and set as HTTP-only cookie
 const setAuthCookie = (res, payload) => {
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' })
-  res.cookie('token', token, { httpOnly: true, secure: isProd })
+  res.cookie('token', token, { 
+    httpOnly: true, 
+    secure: isProd,
+    sameSite: isProd ? 'strict' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  })
 }
 
 // Auth guard
@@ -98,7 +102,6 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ ok: false, error: 'Invalid credentials' })
     }
 
-    // TODO: validate password
     const valid = await bcrypt.compare(password, user.passwordHash)
 
     if (!valid) {
@@ -120,9 +123,8 @@ app.get('/api/me', requireAuth, (req, res) => {
 })
 
 app.post('/api/logout', (req, res) => {
-  // TODO: how do we log out?
-
-  return res.json({ ok: true, message: 'Logged out' })
+  res.clearCookie('token')
+  return res.status(200).json({ ok: true, message: 'Logged out' })
 })
 
 // Fallback to index.html for root
