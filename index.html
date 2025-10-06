@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>JWT Auth Workshop</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- React (no build step) -->
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      :root {
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial;
+      }
+      body {
+        margin: 0;
+        background: #0b1220;
+        color: #e8eefc;
+      }
+      .wrap {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 440px;
+        background: #121a2b;
+        border: 1px solid #1e2a44;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      h1,
+      h2 {
+        margin: 0 0 12px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .tab {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #2a3a61;
+        background: #0e1729;
+        color: #cfe0ff;
+        border-radius: 10px;
+        cursor: pointer;
+        text-align: center;
+      }
+      .tab.active {
+        background: #1a2551;
+        border-color: #3a4f87;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+        margin: 10px 0;
+      }
+      input {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #2a3a61;
+        background: #0e1729;
+        color: #e8eefc;
+      }
+      button {
+        margin-top: 12px;
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #3a4f87;
+        background: #1f2c59;
+        color: #e8eefc;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover {
+        filter: brightness(1.05);
+      }
+      .muted {
+        color: #9fb3dd;
+        font-size: 12px;
+      }
+      .error {
+        background: #3a0f16;
+        border: 1px solid #7b1f2c;
+        color: #ffd6db;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+      }
+      .ok {
+        background: #12321e;
+        border: 1px solid #255a39;
+        color: #d2ffe1;
+        padding: 10px;
+        border-radius: 10px;
+        margin: 10px 0;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .logout {
+        margin-top: 10px;
+        background: #2a1f1f;
+        border-color: #684545;
+      }
+      .hint {
+        font-size: 12px;
+        color: #8bb2ff;
+        margin-top: 4px;
+      }
+      a {
+        color: #9bc2ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useEffect, useState } = React
+
+      const api = {
+        async signup(payload) {
+          const res = await fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          return res.json()
+        },
+        async login(payload) {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          return res.json()
+        },
+        async me() {
+          const res = await fetch('/api/me')
+          return res.json()
+        },
+        async logout() {
+          const res = await fetch('/api/logout', { method: 'POST' })
+          return res.json()
+        },
+      }
+
+      function TextField({
+        label,
+        type = 'text',
+        value,
+        onChange,
+        placeholder,
+      }) {
+        return (
+          <label className="field">
+            <span>{label}</span>
+            <input
+              type={type}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              autoComplete={type === 'password' ? 'current-password' : 'on'}
+            />
+          </label>
+        )
+      }
+
+      function AuthTabs({ tab, setTab }) {
+        return (
+          <div className="tabs">
+            <button
+              className={`tab ${tab === 'login' ? 'active' : ''}`}
+              onClick={() => setTab('login')}>
+              Login
+            </button>
+            <button
+              className={`tab ${tab === 'signup' ? 'active' : ''}`}
+              onClick={() => setTab('signup')}>
+              Sign Up
+            </button>
+          </div>
+        )
+      }
+
+      function LoginView({ onSuccess, switchToSignUp }) {
+        const [email, setEmail] = useState('')
+        const [password, setPassword] = useState('')
+        const [msg, setMsg] = useState(null)
+        const [error, setError] = useState(null)
+        const [busy, setBusy] = useState(false)
+
+        async function handleLogin(e) {
+          e.preventDefault()
+          setBusy(true)
+          setError(null)
+          setMsg(null)
+          const data = await api.login({ email, password })
+          setBusy(false)
+          if (data.ok) {
+            setMsg('Logged in successfully.')
+            onSuccess(data.user)
+          } else setError(data.error || 'Login failed')
+        }
+
+        return (
+          <>
+            <h2>Welcome back</h2>
+            <p className="muted">Use a test account or sign up below.</p>
+            {error && <div className="error">{error}</div>}
+            {msg && <div className="ok">{msg}</div>}
+            <form onSubmit={handleLogin}>
+              <TextField
+                label="Email"
+                value={email}
+                onChange={setEmail}
+                placeholder="you@example.com"
+              />
+              <TextField
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+              />
+              <button disabled={busy}>
+                {busy ? 'Signing in...' : 'Login'}
+              </button>
+            </form>
+            <p className="hint">
+              No account?{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  switchToSignUp()
+                }}>
+                Sign up
+              </a>
+            </p>
+          </>
+        )
+      }
+
+      function SignUpView({ onSuccess, switchToLogin }) {
+        const [name, setName] = useState('')
+        const [email, setEmail] = useState('')
+        const [password, setPassword] = useState('')
+        const [msg, setMsg] = useState(null)
+        const [error, setError] = useState(null)
+        const [busy, setBusy] = useState(false)
+
+        async function handleSignup(e) {
+          e.preventDefault()
+          setBusy(true)
+          setError(null)
+          setMsg(null)
+          const data = await api.signup({ name, email, password })
+          setBusy(false)
+          if (data.ok) {
+            setMsg('Signed up! You are now logged in.')
+            onSuccess(data.user)
+          } else setError(data.error || 'Sign up failed')
+        }
+
+        return (
+          <>
+            <h2>Create account</h2>
+            <p className="muted">We’ll log you in right after sign up.</p>
+            {error && <div className="error">{error}</div>}
+            {msg && <div className="ok">{msg}</div>}
+            <form onSubmit={handleSignup}>
+              <TextField
+                label="Name"
+                value={name}
+                onChange={setName}
+                placeholder="Ada Lovelace"
+              />
+              <TextField
+                label="Email"
+                value={email}
+                onChange={setEmail}
+                placeholder="you@example.com"
+              />
+              <TextField
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder="min 6 characters"
+              />
+              <button disabled={busy}>
+                {busy ? 'Creating...' : 'Sign Up'}
+              </button>
+            </form>
+            <p className="hint">
+              Already have an account?{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  switchToLogin()
+                }}>
+                Login
+              </a>
+            </p>
+          </>
+        )
+      }
+
+      function HomeView({ user, onLogout }) {
+        const [me, setMe] = useState(user)
+        const [error, setError] = useState(null)
+
+        useEffect(() => {
+          ;(async () => {
+            const data = await api.me()
+            if (data.ok) setMe(data.user)
+            else setError(data.error || 'Could not fetch profile')
+          })()
+        }, [])
+
+        async function handleLogout() {
+          await api.logout()
+          onLogout()
+        }
+
+        return (
+          <>
+            <h2>Protected Home</h2>
+            <p className="muted">
+              This page requires a valid JWT (stored in an HTTP-only cookie).
+            </p>
+            {error && <div className="error">{error}</div>}
+            {me && (
+              <div className="ok">
+                Logged in as <strong>{me.name}</strong> (<code>{me.email}</code>
+                )
+              </div>
+            )}
+            <button className="logout" onClick={handleLogout}>
+              Log Out
+            </button>
+            <p className="hint">
+              Try refreshing the page—your session persists until you log out.
+            </p>
+          </>
+        )
+      }
+
+      function App() {
+        const [tab, setTab] = useState('login')
+        const [authed, setAuthed] = useState(false)
+        const [user, setUser] = useState(null)
+        const [checked, setChecked] = useState(false)
+
+        // On load, check session
+        useEffect(() => {
+          ;(async () => {
+            const data = await api.me()
+            if (data.ok) {
+              setAuthed(true)
+              setUser(data.user)
+              setTab('home')
+            }
+            setChecked(true)
+          })()
+        }, [])
+
+        function onAuth(u) {
+          setAuthed(true)
+          setUser(u)
+          setTab('home')
+        }
+        function onLogout() {
+          setAuthed(false)
+          setUser(null)
+          setTab('login')
+        }
+
+        return (
+          <div className="wrap">
+            <div className="card">
+              <h1>JWT Auth Demo</h1>
+              {!authed && <AuthTabs tab={tab} setTab={setTab} />}
+
+              {!checked ? (
+                <p className="muted">Loading…</p>
+              ) : authed ? (
+                <HomeView user={user} onLogout={onLogout} />
+              ) : tab === 'signup' ? (
+                <SignUpView
+                  onSuccess={onAuth}
+                  switchToLogin={() => setTab('login')}
+                />
+              ) : (
+                <LoginView
+                  onSuccess={onAuth}
+                  switchToSignUp={() => setTab('signup')}
+                />
+              )}
+
+              <p className="muted" style={{ marginTop: 16 }}>
+                Workshop tip: Open DevTools → Network to see requests and
+                responses.
+              </p>
+            </div>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+    </script>
+  </body>
+</html>
